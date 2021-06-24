@@ -1,3 +1,7 @@
+// CartoLoRaTracker: a M5stack-based (ESP32) tracker node to evaluate the coverage of a LoRa network, using RawLoRa messages
+// Authors: Adrien van den Bossche <vandenbo@irit.fr>
+// Code under GPLv3 licence
+
 #include <Locapack.h>
 #include <TinyGPS++.h>
 #include <SPI.h>
@@ -6,12 +10,12 @@
 #include <M5Stack.h>
 #include <WiFi.h>
 #include <WiFiMulti.h> 
-#include <PubSubClient.h> //Librairie pour la gestion Mqtt 
+#include <PubSubClient.h>
 
 const char* ssid = "xxx";
 const char* password = "xxx";
-const char* mqtt_server = "loraserver.tetaneutral.net"; //Adresse IP du Broker Mqtt
-const int mqttPort = 1883; //port utilisé par le Broker 
+const char* mqtt_server = "loraserver.tetaneutral.net";
+const int mqttPort = 1883; 
 
 #define NODE_ADDRESS 0x1234
 #define LOCAPACK_PACKET_PERIOD 10000
@@ -371,17 +375,5 @@ void printGeneratedLocapackPacket (uint8_t* buffer, char* str_temp)
     , gps.speed.kmph(), txPower, frequency*1000000, signalBandwidth/1000.0, spreadingFactor
   );
 
-  //sprintf(str_temp,"{%s,%s,%s}", header_data, payload_data, physical_data);
   sprintf(str_temp,"{%s,%s,%s}",header_data, payload_data, physical_data);
-}
-
-
-void printUint64(uint64_t value, char* sz)
-{
-  const int NUM_DIGITS = log10(value) + 1;
-  sz[NUM_DIGITS] =  0;
-  for ( size_t i = NUM_DIGITS; i--; value /= 10)
-  {
-    sz[i] = '0' + (value % 10);
-  }
 }

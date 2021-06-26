@@ -1,5 +1,5 @@
 // CartoLoRaTracker: a M5stack-based (ESP32) tracker node to evaluate the coverage of a LoRa network, using RawLoRa messages
-// Authors: Adrien van den Bossche <vandenbo@irit.fr>
+// Authors: Adrien van den Bossche <vandenbo@irit.fr>, Anaïs Thillaye <Anais.Thillaye@irit.fr>
 // Code under GPLv3 licence
 
 #include <Locapack.h>
@@ -376,4 +376,15 @@ void printGeneratedLocapackPacket (uint8_t* buffer, char* str_temp)
   );
 
   sprintf(str_temp,"{%s,%s,%s}",header_data, payload_data, physical_data);
+}
+
+
+void printUint64(uint64_t value, char* sz)
+{
+  const int NUM_DIGITS = log10(value) + 1;
+  sz[NUM_DIGITS] =  0;
+  for ( size_t i = NUM_DIGITS; i--; value /= 10)
+  {
+    sz[i] = '0' + (value % 10);
+  }
 }

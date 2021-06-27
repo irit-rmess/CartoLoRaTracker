@@ -16,6 +16,7 @@ const char* ssid = "xxx";
 const char* password = "xxx";
 const char* mqtt_server = "loraserver.tetaneutral.net";
 const int mqttPort = 1883; 
+int buzzerActive = true;
 
 #define NODE_ADDRESS 0x1234
 #define LOCAPACK_PACKET_PERIOD 10000
@@ -89,7 +90,6 @@ void loop(void)
   mqttClient.loop(); 
 
   // Long press on button C to poweroff
-  M5.update();
   if ( M5.BtnC.wasReleasefor(3000) ) M5.Power.powerOFF();
 
   // Time to send RawLoRa packet
@@ -119,6 +119,7 @@ void loop(void)
       printGeneratedLocapackPacket(&rawLoRaPayload[2],mqtt_payload_buffer);
       mqttClient.publish(mqttTopicPub, mqtt_payload_buffer);
       Serial.println(mqtt_payload_buffer);
+      if ( buzzerActive ) M5.Speaker.tone(220, 20);      
     }
   }
 
@@ -128,6 +129,8 @@ void loop(void)
     timeToUpdateLcd = millis() + UPDATE_LCD_PERIOD;
     updateLcd();
   }
+
+  M5.update();
 }
 
 
@@ -203,6 +206,12 @@ void mqttCallback(char* topic, byte *payload, unsigned int length)
   Serial.print("Payload:");
   Serial.write(payload, length);
   Serial.println();
+
+  if ( buzzerActive )
+  {
+    M5.Speaker.tone(440, 20);
+    M5.update();
+  }
 }
 
 

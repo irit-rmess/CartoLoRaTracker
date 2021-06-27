@@ -83,15 +83,22 @@ void loop(void)
   // Process GPS data
   gps_process();
 
+  // Wifi and MQTT
   mqttReconnect();
   mqttClient.loop(); 
 
+  // Long press on button C to poweroff
+  M5.update();
+  if ( M5.BtnC.wasReleasefor(3000) ) M5.Power.powerOFF();
+
+  // Update LCD
   if ( millis() > timeToUpdateLcd )
   {
     timeToUpdateLcd = millis() + UPDATE_LCD_PERIOD;
     updateLcd();
   }
 
+  // Time to send RawLoRa packet
   if (millis() > timetosendlocapack)
   {
     timetosendlocapack += LOCAPACK_PACKET_PERIOD + random(1000);

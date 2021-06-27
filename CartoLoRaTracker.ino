@@ -48,6 +48,7 @@ uint32_t _rgb_timeout = 0;
 uint16_t nodeAddress = NODE_ADDRESS;
 long signalBandwidth = 125000;
 uint8_t spreadingFactor = 10;
+uint8_t spreadingFactorsList[] = {7, 8, 9, 10, 11, 12};
 uint8_t codingRate4 = 5;
 float frequency = 867.7;
 int8_t txPower = 14;
@@ -91,13 +92,6 @@ void loop(void)
   M5.update();
   if ( M5.BtnC.wasReleasefor(3000) ) M5.Power.powerOFF();
 
-  // Update LCD
-  if ( millis() > timeToUpdateLcd )
-  {
-    timeToUpdateLcd = millis() + UPDATE_LCD_PERIOD;
-    updateLcd();
-  }
-
   // Time to send RawLoRa packet
   if (millis() > timetosendlocapack)
   {
@@ -117,12 +111,22 @@ void loop(void)
       len += 2;
       *rawLoRaSqn++;
       //for (int i=0; i<len+rawLoRaHeaderSize; i++) Serial.printf("|%02x",rawLoRaFrame[i]); Serial.println("|");
+      //spreadingFactor = spreadingFactorsList[random(sizeof(spreadingFactorsList))];
+      //Serial.println(spreadingFactor);
+      //rf95.setSpreadingFactor(spreadingFactor); delay(100);
       rf95.send(rawLoRaFrame, len+rawLoRaHeaderSize);
       rf95.waitPacketSent();
       printGeneratedLocapackPacket(&rawLoRaPayload[2],mqtt_payload_buffer);
       mqttClient.publish(mqttTopicPub, mqtt_payload_buffer);
       Serial.println(mqtt_payload_buffer);
     }
+  }
+
+  // Update LCD after all blocking actions in the loop
+  if ( millis() > timeToUpdateLcd )
+  {
+    timeToUpdateLcd = millis() + UPDATE_LCD_PERIOD;
+    updateLcd();
   }
 }
 
@@ -284,6 +288,12 @@ void updateLcd(void)
     if (gps.time.second() < 10) M5.Lcd.print("0");
     M5.Lcd.print(gps.time.second());
   }
+
+  y+=30;
+  M5.Lcd.setCursor(10, y);
+  M5.Lcd.print(frequency);
+  M5.Lcd.print("MHz/SF");
+  M5.Lcd.print(spreadingFactor);
 
   M5.update();
 }

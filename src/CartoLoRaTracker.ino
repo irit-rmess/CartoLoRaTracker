@@ -11,6 +11,7 @@
 #include <WiFi.h>
 #include <WiFiMulti.h> 
 #include <PubSubClient.h>
+#include "Display.h"
 
 const char* ssid = "xxx";
 const char* password = "xxx";
@@ -57,23 +58,31 @@ int8_t txPower = 14;
 char mqttTopicPub[1024];
 char mqttTopicSub[1024];
 
-
 void setup(void)
 {
   M5.begin();
   M5.Power.begin();
   Serial.print("Starting ...\r\n");
+  DisplayInit();
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setTextColor(WHITE);
-  M5.Lcd.setTextSize(2);
+  M5.Lcd.setTextSize(3);
+  M5.Lcd.setCursor(20, 50);
+  M5.Lcd.print("CartoLoraTracker");
+
   GNSS_SERIAL.begin(9600);
 
+  CoverScrollText("Connecting to Wifi", TFT_WHITE);
   wifiSetup();
+  CoverScrollText("Connecting to MQTT", TFT_WHITE);
   mqttSetup();
+  CoverScrollText("Configuring raw LoRa", TFT_WHITE);
   rawLoRaSetup();
 
   locapack.setdevice_id16(nodeAddress);
   timetosendlocapack = LOCAPACK_PACKET_PERIOD + random(LOCAPACK_PACKET_PERIOD);
+
+  M5.Lcd.setTextSize(2);
 }
 
 

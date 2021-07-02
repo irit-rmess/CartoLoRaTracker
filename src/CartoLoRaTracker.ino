@@ -19,8 +19,8 @@ const int mqttPort = 1883;
 int buzzerActive = true;
 
 #define NODE_ADDRESS 0x1234
-#define LOCAPACK_PACKET_PERIOD 10000
-#define UPDATE_LCD_PERIOD 2000
+#define LOCAPACK_PACKET_PERIOD 3333 //10000
+#define UPDATE_LCD_PERIOD 1000
 
 #define RFM95_CS 5 // M5-stack
 #define RFM95_DIO0 36 // M5-stack
@@ -28,6 +28,7 @@ int buzzerActive = true;
 #define RANDOM_SEED randomSeed(analogRead(0))
 #define MAX_RAWLORA_DATA_LEN 64 // Maximum RawLoRa frame size (from radiohead)
 #define MQTT_BUFFER_SIZE 4096
+#define SPEAKER_BEEP_DURATION 50
 
 RH_RF95 rf95(RFM95_CS, RFM95_DIO0);
 WiFiMulti WiFiMulti;
@@ -89,6 +90,11 @@ void loop(void)
   mqttReconnect();
   mqttClient.loop(); 
 
+  // Short press on button A to mute speaker and long press on button A to active
+  if (M5.BtnA.wasReleased() || M5.BtnA.pressedFor(1000, 200)) {
+    buzzerActive = false;
+  } else if ( M5.BtnA.wasReleasefor(3000) ) buzzerActive = true;
+
   // Long press on button C to poweroff
   if ( M5.BtnC.wasReleasefor(3000) ) M5.Power.powerOFF();
 
@@ -119,7 +125,10 @@ void loop(void)
       printGeneratedLocapackPacket(&rawLoRaPayload[2],mqtt_payload_buffer);
       mqttClient.publish(mqttTopicPub, mqtt_payload_buffer);
       Serial.println(mqtt_payload_buffer);
-      if ( buzzerActive ) M5.Speaker.tone(220, 20);      
+      if ( buzzerActive )
+      {
+        M5.Speaker.tone(220, SPEAKER_BEEP_DURATION);
+      }
     }
   }
 
@@ -209,8 +218,7 @@ void mqttCallback(char* topic, byte *payload, unsigned int length)
 
   if ( buzzerActive )
   {
-    M5.Speaker.tone(440, 20);
-    M5.update();
+    M5.Speaker.tone(440, SPEAKER_BEEP_DURATION);
   }
 }
 

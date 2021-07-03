@@ -58,7 +58,7 @@ float frequency = 867.7;
 int8_t txPower = 14;
 char mqttTopicPub[1024];
 char mqttTopicSub[1024];
-bool rawLoRaSenderFastMode = false;
+int rawLoRaSenderFastMode = false;
 
 void setup(void)
 {
@@ -101,18 +101,15 @@ void loop(void)
   mqttReconnect();
   mqttClient.loop(); 
 
-  // Short press on button A to mute speaker and long press on button A to active
-  if (M5.BtnA.wasReleased() || M5.BtnA.pressedFor(1000, 200)) {
-    buzzerActive = false;
-  } else if ( M5.BtnA.wasReleasefor(2000) ) buzzerActive = true;
+  // Short press on button A to mute or unmute speaker 
+  if (M5.BtnA.wasReleased()) {
+    buzzerActive = !buzzerActive;
+  }
 
-  // Short press on button B to enable fast mode and long press on button B for normal mode
-  if (M5.BtnB.wasReleased() || M5.BtnB.pressedFor(1000, 200)) {
-    rawLoRaSenderFastMode = true;
-  } else if ( M5.BtnB.wasReleasefor(2000) ) rawLoRaSenderFastMode = false;
-
-  // Long press on button C to poweroff
-  if ( M5.BtnC.wasReleasefor(2000) ) M5.Power.powerOFF();
+  // Short press on button B to enable/disable fast mode
+  if (M5.BtnB.wasReleased()) {
+    rawLoRaSenderFastMode = !rawLoRaSenderFastMode;
+  }
 
   // Time to send RawLoRa packet
   if (millis() > timetosendlocapack)
@@ -295,12 +292,10 @@ void updateLcd(void)
   M5.Lcd.setCursor(10, y);
   if (gps.location.isValid())
   {
-    M5.Lcd.print("lat:");
-    M5.Lcd.print(gps.location.lat(), 6);
-    y+=20;
-    M5.Lcd.setCursor(10, y);
-    M5.Lcd.print("lon:");
-    M5.Lcd.print(gps.location.lng(), 6);
+    M5.Lcd.print("gnss:");
+    M5.Lcd.print(gps.location.lat(), 5);
+    M5.Lcd.print("/");
+    M5.Lcd.print(gps.location.lng(), 5);
   }
   else
   {
@@ -334,6 +329,14 @@ void updateLcd(void)
   M5.Lcd.print(frequency);
   M5.Lcd.print("MHz/SF");
   M5.Lcd.print(spreadingFactor);
+  
+  M5.Lcd.setCursor(35, 220);
+  if ( buzzerActive ) M5.Lcd.print(" mute ");
+  else M5.Lcd.print("unmute");
+
+  M5.Lcd.setCursor(125, 220);
+  if ( rawLoRaSenderFastMode ) M5.Lcd.print(" fast ");
+  else M5.Lcd.print("normal");
 
   M5.update();
 }

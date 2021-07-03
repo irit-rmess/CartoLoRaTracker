@@ -115,13 +115,15 @@ void loop(void)
   // Short press on button A to mute or unmute speaker 
   if (M5.BtnA.wasReleased()) {
     buzzerActive = !buzzerActive;
+    M5.update();
   }
 
   // Short press on button B to enable/disable fast mode
   if (M5.BtnB.wasReleased()) {
     rawLoRaSenderFastMode = !rawLoRaSenderFastMode;
-    if ( rawLoRaSenderFastMode ) timetosendlocapack += LOCAPACK_PACKET_PERIOD_FAST + random(3000);
-    else timetosendlocapack += LOCAPACK_PACKET_PERIOD_NORMAL + random(1000);
+    if ( rawLoRaSenderFastMode ) timetosendlocapack = millis() + LOCAPACK_PACKET_PERIOD_FAST;
+    else timetosendlocapack = millis() + LOCAPACK_PACKET_PERIOD_NORMAL;
+    M5.update(); 
   }
 
   // Update speaker
@@ -130,8 +132,8 @@ void loop(void)
   // Time to send RawLoRa packet
   if (millis() > timetosendlocapack)
   {
-    if ( rawLoRaSenderFastMode ) timetosendlocapack += LOCAPACK_PACKET_PERIOD_FAST + random(3000);
-    else timetosendlocapack += LOCAPACK_PACKET_PERIOD_NORMAL + random(1000);
+    if ( rawLoRaSenderFastMode ) timetosendlocapack = millis() + LOCAPACK_PACKET_PERIOD_FAST + random(1000);
+    else timetosendlocapack = millis() + LOCAPACK_PACKET_PERIOD_NORMAL + random(1000);
 
     if (gnss_valid)
     {

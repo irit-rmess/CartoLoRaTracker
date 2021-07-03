@@ -17,10 +17,11 @@ const char* ssid = "xxx";
 const char* password = "xxx";
 const char* mqtt_server = "loraserver.tetaneutral.net";
 const int mqttPort = 1883; 
-int buzzerActive = true;
+int buzzerActive = false;
 
 #define NODE_ADDRESS 0x1234
-#define LOCAPACK_PACKET_PERIOD 3333 //10000
+#define LOCAPACK_PACKET_PERIOD_NORMAL 20000
+#define LOCAPACK_PACKET_PERIOD_FAST 6000
 #define UPDATE_LCD_PERIOD 1000
 
 #define RFM95_CS 5 // M5-stack
@@ -57,6 +58,7 @@ float frequency = 867.7;
 int8_t txPower = 14;
 char mqttTopicPub[1024];
 char mqttTopicSub[1024];
+bool rawLoRaSenderFastMode = false;
 
 void setup(void)
 {
@@ -80,7 +82,7 @@ void setup(void)
   rawLoRaSetup();
 
   locapack.setdevice_id16(nodeAddress);
-  timetosendlocapack = LOCAPACK_PACKET_PERIOD + random(LOCAPACK_PACKET_PERIOD);
+  timetosendlocapack = LOCAPACK_PACKET_PERIOD_NORMAL + random(LOCAPACK_PACKET_PERIOD_NORMAL);
 
   M5.Lcd.setTextSize(2);
 }
@@ -102,15 +104,21 @@ void loop(void)
   // Short press on button A to mute speaker and long press on button A to active
   if (M5.BtnA.wasReleased() || M5.BtnA.pressedFor(1000, 200)) {
     buzzerActive = false;
-  } else if ( M5.BtnA.wasReleasefor(3000) ) buzzerActive = true;
+  } else if ( M5.BtnA.wasReleasefor(2000) ) buzzerActive = true;
+
+  // Short press on button B to enable fast mode and long press on button B for normal mode
+  if (M5.BtnB.wasReleased() || M5.BtnB.pressedFor(1000, 200)) {
+    rawLoRaSenderFastMode = true;
+  } else if ( M5.BtnB.wasReleasefor(2000) ) rawLoRaSenderFastMode = false;
 
   // Long press on button C to poweroff
-  if ( M5.BtnC.wasReleasefor(3000) ) M5.Power.powerOFF();
+  if ( M5.BtnC.wasReleasefor(2000) ) M5.Power.powerOFF();
 
   // Time to send RawLoRa packet
   if (millis() > timetosendlocapack)
   {
-    timetosendlocapack += LOCAPACK_PACKET_PERIOD + random(1000);
+    if ( rawLoRaSenderFastMode ) timetosendlocapack += LOCAPACK_PACKET_PERIOD_FAST + random(3000);
+    else timetosendlocapack += LOCAPACK_PACKET_PERIOD_NORMAL + random(1000);
 
     if (gnss_valid)
     {
@@ -137,6 +145,9 @@ void loop(void)
       if ( buzzerActive )
       {
         M5.Speaker.tone(220, SPEAKER_BEEP_DURATION);
+        M5.update();
+        M5.Speaker.tone(220, -1);
+        M5.update();
       }
     }
   }
@@ -228,6 +239,9 @@ void mqttCallback(char* topic, byte *payload, unsigned int length)
   if ( buzzerActive )
   {
     M5.Speaker.tone(440, SPEAKER_BEEP_DURATION);
+    M5.update();
+    M5.Speaker.tone(220, -1);
+    M5.update();
   }
 }
 

@@ -30,7 +30,8 @@ int buzzerActive = false;
 #define RANDOM_SEED randomSeed(analogRead(0))
 #define MAX_RAWLORA_DATA_LEN 64 // Maximum RawLoRa frame size (from radiohead)
 #define MQTT_BUFFER_SIZE 4096
-#define SPEAKER_BEEP_DURATION 50
+#define SPEAKER_BEEP_DURATION 100
+#define BEEPS_SIZE 64
 
 RH_RF95 rf95(RFM95_CS, RFM95_DIO0);
 WiFiMulti WiFiMulti;
@@ -60,6 +61,15 @@ char mqttTopicPub[1024];
 char mqttTopicSub[1024];
 int rawLoRaSenderFastMode = false;
 
+typedef struct {
+  uint16_t freq;
+  uint32_t duration;
+} beep_t;
+
+beep_t beeps[32];
+int beeps_read, beeps_write = 0;
+
+
 void setup(void)
 {
   M5.begin();
@@ -71,6 +81,7 @@ void setup(void)
   M5.Lcd.setTextSize(3);
   M5.Lcd.setCursor(20, 50);
   M5.Lcd.print("CartoLoraTracker");
+  beeps_init();
 
   GNSS_SERIAL.begin(9600);
 
@@ -109,7 +120,12 @@ void loop(void)
   // Short press on button B to enable/disable fast mode
   if (M5.BtnB.wasReleased()) {
     rawLoRaSenderFastMode = !rawLoRaSenderFastMode;
+    if ( rawLoRaSenderFastMode ) timetosendlocapack += LOCAPACK_PACKET_PERIOD_FAST + random(3000);
+    else timetosendlocapack += LOCAPACK_PACKET_PERIOD_NORMAL + random(1000);
   }
+
+  // Update speaker
+  beeps_engine();
 
   // Time to send RawLoRa packet
   if (millis() > timetosendlocapack)
@@ -141,10 +157,8 @@ void loop(void)
       Serial.println(mqtt_payload_buffer);
       if ( buzzerActive )
       {
-        M5.Speaker.tone(220, SPEAKER_BEEP_DURATION);
-        M5.update();
-        M5.Speaker.tone(220, -1);
-        M5.update();
+        beeps_schedule(220, SPEAKER_BEEP_DURATION);
+        beeps_schedule(0, SPEAKER_BEEP_DURATION);
       }
     }
   }
@@ -235,10 +249,8 @@ void mqttCallback(char* topic, byte *payload, unsigned int length)
 
   if ( buzzerActive )
   {
-    M5.Speaker.tone(440, SPEAKER_BEEP_DURATION);
-    M5.update();
-    M5.Speaker.tone(220, -1);
-    M5.update();
+    beeps_schedule(440, SPEAKER_BEEP_DURATION);
+    beeps_schedule(0, SPEAKER_BEEP_DURATION);
   }
 }
 
@@ -266,6 +278,7 @@ void updateLcd(void)
 {
   int y=10;
   M5.Lcd.fillScreen(BLACK);
+  M5.Lcd.setTextColor(WHITE);
 
   // Networking information
   M5.Lcd.setCursor(10, y);
@@ -448,3 +461,40 @@ void printUint64(uint64_t value, char* sz)
     sz[i] = '0' + (value % 10);
   }
 }
+
+
+void beeps_init (void)
+{
+  for (int i=0; i<BEEPS_SIZE; i++)
+  {
+    beeps[i].freq = 0;
+    beeps[i].duration = 0;
+  }
+  beeps_read = 0;
+  beeps_write = 0;
+}
+
+
+void beeps_engine (void)
+{
+  static uint32_t timeout = 0;
+
+  if (millis() > timeout)
+  {
+    if (beeps_read != beeps_write)
+    {
+      timeout = millis()+beeps[beeps_read].duration;
+      if (beeps[beeps_read].freq == 0) M5.Speaker.mute();
+      else M5.Speaker.tone(beeps[beeps_read].freq, beeps[beeps_read].duration);
+      if (++beeps_read == BEEPS_SIZE) beeps_read = 0;
+    }
+  }
+}
+
+void beeps_schedule (uint16_t freq, uint32_t duration)
+{
+  if (++beeps_write == BEEPS_SIZE) beeps_write = 0;
+  beeps[beeps_write].freq = freq;
+  beeps[beeps_write].duration = duration;
+}
+

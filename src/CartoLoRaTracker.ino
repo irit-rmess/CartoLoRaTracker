@@ -17,7 +17,7 @@ const char* ssid = "xxx";
 const char* password = "xxx";
 const char* mqtt_server = "loraserver.tetaneutral.net";
 const int mqttPort = 1883; 
-int buzzerActive = false;
+int buzzerActive = 0;
 
 #define NODE_ADDRESS 0x1234
 #define LOCAPACK_PACKET_PERIOD_NORMAL 20000
@@ -59,7 +59,7 @@ float frequency = 867.7;
 int8_t txPower = 14;
 char mqttTopicPub[1024];
 char mqttTopicSub[1024];
-int rawLoRaSenderFastMode = false;
+int rawLoRaSenderFastMode = 0;
 
 typedef struct {
   uint16_t freq;
@@ -96,6 +96,7 @@ void setup(void)
   timetosendlocapack = LOCAPACK_PACKET_PERIOD_NORMAL + random(LOCAPACK_PACKET_PERIOD_NORMAL);
 
   M5.Lcd.setTextSize(2);
+  M5.Lcd.fillScreen(BLACK);
 }
 
 
@@ -118,7 +119,7 @@ void loop(void)
     M5.update();
   }
 
-  // Short press on button B to enable/disable fast mode
+  // Short press on button B to enable/disable fast mode and reschedule next message
   if (M5.BtnB.wasReleased()) {
     rawLoRaSenderFastMode = !rawLoRaSenderFastMode;
     if ( rawLoRaSenderFastMode ) timetosendlocapack = millis() + LOCAPACK_PACKET_PERIOD_FAST;
@@ -350,8 +351,8 @@ void updateLcd(void)
   else M5.Lcd.print("unmute");
 
   M5.Lcd.setCursor(125, 220);
-  if ( rawLoRaSenderFastMode ) M5.Lcd.print(" fast ");
-  else M5.Lcd.print("normal");
+  if ( rawLoRaSenderFastMode ) M5.Lcd.print("normal");
+  else M5.Lcd.print(" fast ");
 
   M5.update();
 }

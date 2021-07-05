@@ -2,7 +2,7 @@
 
 ## Platformio
 
-CartoLoRaTracker recommands Platformio.
+CartoLoRaTracker recommends Platformio.
 
 1. Follow https://docs.platformio.org/en/latest/core/installation.html#installation-methods to install Platformio
 2. Clone the Radiohead library https://lab.iut-blagnac.fr/adrien/radiohead-lab in `lib/` directory

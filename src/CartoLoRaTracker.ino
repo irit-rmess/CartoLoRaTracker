@@ -10,6 +10,7 @@
 #include <M5Stack.h>
 #include <WiFi.h>
 #include <WiFiMulti.h> 
+#include "AsyncUDP.h"
 #include <PubSubClient.h>
 #include "Display.h"
 
@@ -26,7 +27,11 @@ int buzzerActive = 0;
 
 #define RFM95_CS 5 // M5-stack
 #define RFM95_DIO0 36 // M5-stack
-#define GNSS_SERIAL Serial2
+
+#define GNSS_UDP
+#define GNSS_UDP_PORT 3333
+//#define GNSS_SERIAL Serial2
+
 #define RANDOM_SEED randomSeed(analogRead(0))
 #define MAX_RAWLORA_DATA_LEN 64 // Maximum RawLoRa frame size (from radiohead)
 #define MQTT_BUFFER_SIZE 4096
@@ -36,6 +41,7 @@ int buzzerActive = 0;
 RH_RF95 rf95(RFM95_CS, RFM95_DIO0);
 WiFiMulti WiFiMulti;
 WiFiClient espClient;
+AsyncUDP udp;
 PubSubClient mqttClient(espClient);
 TinyGPSPlus gps;
 Locapack locapack;
@@ -83,7 +89,9 @@ void setup(void)
   M5.Lcd.print("CartoLoraTracker");
   beeps_init();
 
+#ifdef GNSS_SERIAL
   GNSS_SERIAL.begin(9600);
+#endif
 
   CoverScrollText("Connecting to Wifi", TFT_WHITE);
   wifiSetup();
@@ -92,6 +100,17 @@ void setup(void)
   CoverScrollText("Configuring raw LoRa", TFT_WHITE);
   rawLoRaSetup();
 
+#ifdef GNSS_UDP
+  if (udp.listen(GNSS_UDP_PORT)) {
+    udp.onPacket([](AsyncUDPPacket packet) {
+      while (packet.available()) {
+        char c = packet.read();
+        gps_process(c);
+      }
+    });
+  }
+#endif
+
   locapack.setdevice_id16(nodeAddress);
   timetosendlocapack = LOCAPACK_PACKET_PERIOD_NORMAL + random(LOCAPACK_PACKET_PERIOD_NORMAL);
 
@@ -99,15 +118,20 @@ void setup(void)
   M5.Lcd.fillScreen(BLACK);
 }
 
-
 void loop(void)
 {
   uint8_t len = 0;
   uint16_t srcMacAddr;
   char mqtt_payload_buffer[MQTT_BUFFER_SIZE];
 
-  // Process GPS data
-  gps_process();
+#ifdef GNSS_SERIAL
+  // Get chars from GPS receiver
+  while (GNSS_SERIAL.available())
+  {
+    char c = GNSS_SERIAL.read();
+    gps_process(c);
+  }
+#endif
 
   // Wifi and MQTT
   mqttReconnect();
@@ -175,7 +199,6 @@ void loop(void)
 
   M5.update();
 }
-
 
 void wifiSetup()
 {
@@ -358,26 +381,19 @@ void updateLcd(void)
 }
 
 
-void gps_process(void)
+void gps_process(char c)
 {
-  // Get chars from GPS receiver
-  while (GNSS_SERIAL.available())
+  if (gps.encode(c))
   {
-    char c = GNSS_SERIAL.read();
-    //Serial.write(c); // uncomment this line if you want to see the GPS data flowing
-
-    if (gps.encode(c))
+    // Did a new valid sentence come in?
+    if ( gps.location.isValid() )
     {
-      // Did a new valid sentence come in?
-      if ( gps.location.isValid() )
-      {
-        gnss.latitude = gps.location.lat();
-        gnss.longitude = gps.location.lng();
-        gnss.altitude = gps.altitude.meters();
-        gnss.dop = gps.hdop.hdop();
-        gnss_age = millis();
-        gnss_valid = true;
-      }
+      gnss.latitude = gps.location.lat();
+      gnss.longitude = gps.location.lng();
+      gnss.altitude = gps.altitude.meters();
+      gnss.dop = gps.hdop.hdop();
+      gnss_age = millis();
+      gnss_valid = true;
     }
   }
 }

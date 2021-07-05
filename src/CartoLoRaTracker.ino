@@ -306,6 +306,9 @@ void updateLcd(void)
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setTextColor(WHITE);
 
+  M5.Lcd.setCursor(10, y);
+  M5.Lcd.print(String("Battery: ") + String(M5.Power.getBatteryLevel()) + String("%"));
+  y+=20;
   // Networking information
   M5.Lcd.setCursor(10, y);
   M5.Lcd.print("SSID:");

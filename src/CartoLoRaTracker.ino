@@ -12,10 +12,13 @@
 #include <WiFiMulti.h> 
 #include <PubSubClient.h>
 #include "Display.h"
+#include <SD.h>
 
 const char* ssid = "xxx";
 const char* password = "xxx";
 const char* mqtt_server = "loraserver.tetaneutral.net";
+bool wifiConnSuccess = false;
+
 const int mqttPort = 1883; 
 int buzzerActive = false;
 
@@ -60,6 +63,19 @@ char mqttTopicPub[1024];
 char mqttTopicSub[1024];
 bool rawLoRaSenderFastMode = false;
 
+const int protocol_version = 1160;
+const int packet_type = 1 ;
+// SD management
+int bandwith = signalBandwidth/1000;
+byte hour,minute,sec;
+int month,day,year;
+const int chipSelect = 25;
+File file;
+static uint32_t sqn = 0;
+uint8_t buffer[64];
+int tmp;
+
+
 void setup(void)
 {
   M5.begin();
@@ -76,8 +92,17 @@ void setup(void)
 
   CoverScrollText("Connecting to Wifi", TFT_WHITE);
   wifiSetup();
-  CoverScrollText("Connecting to MQTT", TFT_WHITE);
-  mqttSetup();
+  if(wifiConnSuccess)
+  {
+    CoverScrollText("Connecting to MQTT", TFT_WHITE);
+    mqttSetup();
+  }
+  CoverScrollText("Initializing SD card", TFT_WHITE);
+  if(SD.begin(chipSelect))
+    CoverScrollText("SD init done", TFT_WHITE);
+  else 
+    CoverScrollText("SD init failed", TFT_WHITE);
+  delay(3000);
   CoverScrollText("Configuring raw LoRa", TFT_WHITE);
   rawLoRaSetup();
 
@@ -98,8 +123,11 @@ void loop(void)
   gps_process();
 
   // Wifi and MQTT
-  mqttReconnect();
-  mqttClient.loop(); 
+  if(wifiConnSuccess)
+  {
+    mqttReconnect();
+    mqttClient.loop(); 
+  }
 
   // Short press on button A to mute speaker and long press on button A to active
   if (M5.BtnA.wasReleased() || M5.BtnA.pressedFor(1000, 200)) {
@@ -140,7 +168,11 @@ void loop(void)
       rf95.send(rawLoRaFrame, len+rawLoRaHeaderSize);
       rf95.waitPacketSent();
       printGeneratedLocapackPacket(&rawLoRaPayload[2],mqtt_payload_buffer);
-      mqttClient.publish(mqttTopicPub, mqtt_payload_buffer);
+      if(wifiConnSuccess)
+      {
+        mqttClient.publish(mqttTopicPub, mqtt_payload_buffer);
+      }
+      ecriture_sd();
       Serial.println(mqtt_payload_buffer);
       if ( buzzerActive )
       {
@@ -166,22 +198,28 @@ void loop(void)
 void wifiSetup()
 {
   uint8_t mac[6];
+  uint8_t retries = 0;
+
   WiFiMulti.addAP(ssid, password);
-  while ( WiFiMulti.run() != WL_CONNECTED )
+  while (( WiFiMulti.run() != WL_CONNECTED ) && (retries < 6))
   {
     delay ( 500 );
+    retries++;
     Serial.print ( "." );
   }
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.print("MAC: ");
-  Serial.println(WiFi.macAddress());
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
+  if(retries < 6) {
+   wifiConnSuccess = true;
+   Serial.println("");
+   Serial.println("WiFi connected");
+   Serial.print("MAC: ");
+   Serial.println(WiFi.macAddress());
+   Serial.print("IP address: ");
+   Serial.println(WiFi.localIP());
 
-  // Set RawLoRa MAC address from two last WiFi MAC address
-  WiFi.macAddress(mac);
-  nodeAddress = mac[4]<<8|mac[5];
+   // Set RawLoRa MAC address from two last WiFi MAC address
+   WiFi.macAddress(mac);
+   nodeAddress = mac[4]<<8|mac[5];
+  }
 }
 
 
@@ -445,3 +483,97 @@ void printUint64(uint64_t value, char* sz)
     sz[i] = '0' + (value % 10);
   }
 }
+
+void ecriture_sd(void)
+{
+    
+   char FILENAME[8];//chaîne de caractères pour le nom des fichier de la carte SD
+   char TEST[200];//message qui contiendra date et heure
+   char data[200];//message qui contiendra protocol_version, timestamp, millisSinceUnixEpoch, packet_type, sequence_number et device_id
+   char data2[200];//message qui contiendra lat, lon, alt, dop et speed
+   char data3[200];//message qui contiendra tx_power, freq, bandwith et Spreading factor
+
+   //Déclaration des variables 
+   day = gps.date.day();
+   month = gps.date.month();
+   hour = gps.time.hour();
+   sec = gps.time.second();
+   minute = gps.time.minute();
+   year = gps.date.year();
+   int jour, annee;
+    
+   if (minute == 0 || minute ==10 || minute ==20 || minute == 30 || minute == 40 || minute == 50 ) //verification de la valeur de la variable minute
+   {
+Serial.println("it's time");
+      file.close(); //fermeture de l'ancien fichier
+      jour = conv_date(); //appel de la fonction servant à convertir la date en format quantien
+      annee = year%10;// extraction du dernier chiffre de l'année
+      sprintf(FILENAME,"//%d%d%02d%02d.txt",jour,annee,hour,minute);//mise en forme du nom du fichier à créer
+      file = SD.open(FILENAME, FILE_WRITE);//création du fichier
+
+        M5.Speaker.tone(220, SPEAKER_BEEP_DURATION);
+        M5.update();
+        M5.Speaker.tone(220, -1);
+        M5.update();
+
+   }
+        
+   
+   if (file) 
+   {
+      int millisSinceUnixEpoch =0;  
+      int vitesse = gps.speed.kmph();
+      //int sequence_number = simplewino.decodeUi16(&buffer[4]);
+      //tmp = simplewino.decodeUi40(&buffer[6]);
+
+      int sequence_number = buffer[4]+buffer[5]*256;
+      tmp = buffer[6] + buffer[7] << 8 + buffer[8] << 16 + buffer[9] << 24 + buffer[10] << 32;
+      
+      sprintf(TEST,"{\"Date\":\"%02d/%02d/%d\",\"Heure\":\"%02d:%02d:%02d\",",day,month,year,hour,minute,sec);
+      sprintf(data,"\"protocol_version\":%d,\"timestamp\":%d,\"millisSinceUnixEpoch\":%d,\"packet_type\":%d,\"sequence_number\":%d,\"device_id\":%d,",protocol_version,tmp,millisSinceUnixEpoch,packet_type,sequence_number,NODE_ADDRESS);
+      sprintf(data2,"\"latitude\":%.8f,\"longitude\":%.8f,\"altitude\":%.2f,\"dop\":%.2f,\"speed\":%d,",(gnss.latitude),(gnss.longitude),(gnss.altitude),(gnss.dop),vitesse);
+      sprintf(data3,"\"tx_power\":%d,\"frequency\":%d,\"bandwith\":%d,\"spreadingFactor\":%d}",txPower,frequency,bandwith,spreadingFactor);
+      file.print(TEST);
+      file.print(data);
+      file.print(data2);
+      file.println(data3);
+Serial.println("file updated");
+   }  
+}
+
+int conv_date(void)//Fonction pour convertir la date en quantième
+{
+  int nb = 0;
+  for (int i=1; month > i; i++)//nombre de jour entre le début de l'année et le début du mois actuel
+    {
+      if (i == 1 || i == 3 || i == 5 || i == 7 || i == 8 || i == 10 || i == 15 ) //pour les mois qui ont 31 jours
+        nb = nb +31;
+      else  
+        if (i == 2) // mois de fevrier
+          if (year%4 == 0)// année bisextile
+            nb=nb+29;
+          else // année classique
+            nb = nb +28;
+            
+        else //mois avec 30 jours
+          nb = nb +30;
+    }
+   nb = nb + day; // ajout du nombre de jour depuis le début du mois
+   return nb;
+}
+
+int conv_millis(void)//Fonction pour obtenir millisSinceUnixEpoch (ne fonctionne pas)
+{
+  int nb = 1;
+  for (int i = 1970; i < year ; i++) // nombre de millis entre 1970 et l'année en cours
+  {
+    if (i%4 ==0) // année bisextile
+      nb = nb + (366 * 24 * 60 * 60* 1000);
+    else //année classique
+      nb = nb + ( 365 * 24 * 60 * 60* 1000);
+  }
+  nb = nb + (conv_date()* 24 * 60 *60*1000);//ajout des millis depeuis début de l'année
+  nb = nb + (hour * 60 *60 *1000) + (minute *60  *1000 + sec * 1000);//ajout des millis depuis le début du jour actuel
+  return nb;
+}
+

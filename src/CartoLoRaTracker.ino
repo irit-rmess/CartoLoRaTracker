@@ -10,6 +10,7 @@
 #include <M5Stack.h>
 #include <WiFi.h>
 #include <WiFiMulti.h> 
+#include "AsyncUDP.h"
 #include <PubSubClient.h>
 #include "Display.h"
 #include <SD.h>
@@ -21,7 +22,7 @@ bool wifiConnSuccess = false;
 
 
 const int mqttPort = 1883; 
-int buzzerActive = false;
+int buzzerActive = 0;
 
 #define NODE_ADDRESS 0x1234
 #define LOCAPACK_PACKET_PERIOD_NORMAL 20000
@@ -30,15 +31,21 @@ int buzzerActive = false;
 
 #define RFM95_CS 5 // M5-stack
 #define RFM95_DIO0 36 // M5-stack
-#define GNSS_SERIAL Serial2
+
+#define GNSS_UDP
+#define GNSS_UDP_PORT 3333
+//#define GNSS_SERIAL Serial2
+
 #define RANDOM_SEED randomSeed(analogRead(0))
 #define MAX_RAWLORA_DATA_LEN 64 // Maximum RawLoRa frame size (from radiohead)
 #define MQTT_BUFFER_SIZE 4096
-#define SPEAKER_BEEP_DURATION 50
+#define SPEAKER_BEEP_DURATION 100
+#define BEEPS_SIZE 64
 
 RH_RF95 rf95(RFM95_CS, RFM95_DIO0);
 WiFiMulti WiFiMulti;
 WiFiClient espClient;
+AsyncUDP udp;
 PubSubClient mqttClient(espClient);
 TinyGPSPlus gps;
 Locapack locapack;
@@ -62,7 +69,16 @@ float frequency = 867.7;
 int8_t txPower = 14;
 char mqttTopicPub[1024];
 char mqttTopicSub[1024];
-bool rawLoRaSenderFastMode = false;
+int rawLoRaSenderFastMode = 0;
+
+typedef struct {
+  uint16_t freq;
+  uint32_t duration;
+} beep_t;
+
+beep_t beeps[32];
+int beeps_read, beeps_write = 0;
+
 
 const int protocol_version = 1160;
 const int packet_type = 1 ;
@@ -89,8 +105,11 @@ void setup(void)
   M5.Lcd.setTextSize(3);
   M5.Lcd.setCursor(20, 50);
   M5.Lcd.print("CartoLoraTracker");
+  beeps_init();
 
+#ifdef GNSS_SERIAL
   GNSS_SERIAL.begin(9600);
+#endif
 
   CoverScrollText("Connecting to Wifi", TFT_WHITE);
   wifiSetup();
@@ -114,12 +133,23 @@ void setup(void)
   CoverScrollText("Configuring raw LoRa", TFT_WHITE);
   rawLoRaSetup();
 
+#ifdef GNSS_UDP
+  if (udp.listen(GNSS_UDP_PORT)) {
+    udp.onPacket([](AsyncUDPPacket packet) {
+      while (packet.available()) {
+        char c = packet.read();
+        gps_process(c);
+      }
+    });
+  }
+#endif
+
   locapack.setdevice_id16(nodeAddress);
   timetosendlocapack = LOCAPACK_PACKET_PERIOD_NORMAL + random(LOCAPACK_PACKET_PERIOD_NORMAL);
 
   M5.Lcd.setTextSize(2);
+  M5.Lcd.fillScreen(BLACK);
 }
-
 
 void loop(void)
 {
@@ -127,8 +157,14 @@ void loop(void)
   uint16_t srcMacAddr;
   char mqtt_payload_buffer[MQTT_BUFFER_SIZE];
 
-  // Process GPS data
-  gps_process();
+#ifdef GNSS_SERIAL
+  // Get chars from GPS receiver
+  while (GNSS_SERIAL.available())
+  {
+    char c = GNSS_SERIAL.read();
+    gps_process(c);
+  }
+#endif
 
   // Wifi and MQTT
   if(wifiConnSuccess)
@@ -137,24 +173,28 @@ void loop(void)
     mqttClient.loop(); 
   }
 
-  // Short press on button A to mute speaker and long press on button A to active
-  if (M5.BtnA.wasReleased() || M5.BtnA.pressedFor(1000, 200)) {
-    buzzerActive = false;
-  } else if ( M5.BtnA.wasReleasefor(2000) ) buzzerActive = true;
+  // Short press on button A to mute or unmute speaker 
+  if (M5.BtnA.wasReleased()) {
+    buzzerActive = !buzzerActive;
+    M5.update();
+  }
 
-  // Short press on button B to enable fast mode and long press on button B for normal mode
-  if (M5.BtnB.wasReleased() || M5.BtnB.pressedFor(1000, 200)) {
-    rawLoRaSenderFastMode = true;
-  } else if ( M5.BtnB.wasReleasefor(2000) ) rawLoRaSenderFastMode = false;
+  // Short press on button B to enable/disable fast mode and reschedule next message
+  if (M5.BtnB.wasReleased()) {
+    rawLoRaSenderFastMode = !rawLoRaSenderFastMode;
+    if ( rawLoRaSenderFastMode ) timetosendlocapack = millis() + LOCAPACK_PACKET_PERIOD_FAST;
+    else timetosendlocapack = millis() + LOCAPACK_PACKET_PERIOD_NORMAL;
+    M5.update(); 
+  }
 
-  // Long press on button C to poweroff
-  if ( M5.BtnC.wasReleasefor(2000) ) M5.Power.powerOFF();
+  // Update speaker
+  beeps_engine();
 
   // Time to send RawLoRa packet
   if (millis() > timetosendlocapack)
   {
-    if ( rawLoRaSenderFastMode ) timetosendlocapack += LOCAPACK_PACKET_PERIOD_FAST + random(3000);
-    else timetosendlocapack += LOCAPACK_PACKET_PERIOD_NORMAL + random(1000);
+    if ( rawLoRaSenderFastMode ) timetosendlocapack = millis() + LOCAPACK_PACKET_PERIOD_FAST + random(1000);
+    else timetosendlocapack = millis() + LOCAPACK_PACKET_PERIOD_NORMAL + random(1000);
 
     if (gnss_valid)
     {
@@ -184,10 +224,8 @@ void loop(void)
       Serial.println(mqtt_payload_buffer);
       if ( buzzerActive )
       {
-        M5.Speaker.tone(220, SPEAKER_BEEP_DURATION);
-        M5.update();
-        M5.Speaker.tone(220, -1);
-        M5.update();
+        beeps_schedule(220, SPEAKER_BEEP_DURATION);
+        beeps_schedule(0, SPEAKER_BEEP_DURATION);
       }
     }
   }
@@ -201,7 +239,6 @@ void loop(void)
 
   M5.update();
 }
-
 
 void wifiSetup()
 {
@@ -284,10 +321,8 @@ void mqttCallback(char* topic, byte *payload, unsigned int length)
 
   if ( buzzerActive )
   {
-    M5.Speaker.tone(440, SPEAKER_BEEP_DURATION);
-    M5.update();
-    M5.Speaker.tone(220, -1);
-    M5.update();
+    beeps_schedule(440, SPEAKER_BEEP_DURATION);
+    beeps_schedule(0, SPEAKER_BEEP_DURATION);
   }
 }
 
@@ -315,7 +350,11 @@ void updateLcd(void)
 {
   int y=10;
   M5.Lcd.fillScreen(BLACK);
+  M5.Lcd.setTextColor(WHITE);
 
+  M5.Lcd.setCursor(10, y);
+  M5.Lcd.print(String("Battery: ") + String(M5.Power.getBatteryLevel()) + String("%"));
+  y+=20;
   // Networking information
   M5.Lcd.setCursor(10, y);
   M5.Lcd.print("SSID:");
@@ -341,12 +380,10 @@ void updateLcd(void)
   M5.Lcd.setCursor(10, y);
   if (gps.location.isValid())
   {
-    M5.Lcd.print("lat:");
-    M5.Lcd.print(gps.location.lat(), 6);
-    y+=20;
-    M5.Lcd.setCursor(10, y);
-    M5.Lcd.print("lon:");
-    M5.Lcd.print(gps.location.lng(), 6);
+    M5.Lcd.print("gnss:");
+    M5.Lcd.print(gps.location.lat(), 5);
+    M5.Lcd.print("/");
+    M5.Lcd.print(gps.location.lng(), 5);
   }
   else
   {
@@ -380,31 +417,32 @@ void updateLcd(void)
   M5.Lcd.print(frequency);
   M5.Lcd.print("MHz/SF");
   M5.Lcd.print(spreadingFactor);
+  
+  M5.Lcd.setCursor(35, 220);
+  if ( buzzerActive ) M5.Lcd.print(" mute ");
+  else M5.Lcd.print("unmute");
+
+  M5.Lcd.setCursor(125, 220);
+  if ( rawLoRaSenderFastMode ) M5.Lcd.print("normal");
+  else M5.Lcd.print(" fast ");
 
   M5.update();
 }
 
 
-void gps_process(void)
+void gps_process(char c)
 {
-  // Get chars from GPS receiver
-  while (GNSS_SERIAL.available())
+  if (gps.encode(c))
   {
-    char c = GNSS_SERIAL.read();
-    //Serial.write(c); // uncomment this line if you want to see the GPS data flowing
-
-    if (gps.encode(c))
+    // Did a new valid sentence come in?
+    if ( gps.location.isValid() )
     {
-      // Did a new valid sentence come in?
-      if ( gps.location.isValid() )
-      {
-        gnss.latitude = gps.location.lat();
-        gnss.longitude = gps.location.lng();
-        gnss.altitude = gps.altitude.meters();
-        gnss.dop = gps.hdop.hdop();
-        gnss_age = millis();
-        gnss_valid = true;
-      }
+      gnss.latitude = gps.location.lat();
+      gnss.longitude = gps.location.lng();
+      gnss.altitude = gps.altitude.meters();
+      gnss.dop = gps.hdop.hdop();
+      gnss_age = millis();
+      gnss_valid = true;
     }
   }
 }
@@ -583,5 +621,40 @@ int conv_millis(void)//Fonction pour obtenir millisSinceUnixEpoch (ne fonctionne
   nb = nb + (conv_date()* 24 * 60 *60*1000);//ajout des millis depeuis début de l'année
   nb = nb + (hour * 60 *60 *1000) + (minute *60  *1000 + sec * 1000);//ajout des millis depuis le début du jour actuel
   return nb;
+}
+
+void beeps_init (void)
+{
+  for (int i=0; i<BEEPS_SIZE; i++)
+  {
+    beeps[i].freq = 0;
+    beeps[i].duration = 0;
+  }
+  beeps_read = 0;
+  beeps_write = 0;
+}
+
+
+void beeps_engine (void)
+{
+  static uint32_t timeout = 0;
+
+  if (millis() > timeout)
+  {
+    if (beeps_read != beeps_write)
+    {
+      timeout = millis()+beeps[beeps_read].duration;
+      if (beeps[beeps_read].freq == 0) M5.Speaker.mute();
+      else M5.Speaker.tone(beeps[beeps_read].freq, beeps[beeps_read].duration);
+      if (++beeps_read == BEEPS_SIZE) beeps_read = 0;
+    }
+  }
+}
+
+void beeps_schedule (uint16_t freq, uint32_t duration)
+{
+  if (++beeps_write == BEEPS_SIZE) beeps_write = 0;
+  beeps[beeps_write].freq = freq;
+  beeps[beeps_write].duration = duration;
 }
 

@@ -19,6 +19,7 @@ const char* password = "xxx";
 const char* mqtt_server = "loraserver.tetaneutral.net";
 bool wifiConnSuccess = false;
 
+
 const int mqttPort = 1883; 
 int buzzerActive = false;
 
@@ -65,6 +66,7 @@ bool rawLoRaSenderFastMode = false;
 
 const int protocol_version = 1160;
 const int packet_type = 1 ;
+
 // SD management
 int bandwith = signalBandwidth/1000;
 byte hour,minute,sec;
@@ -96,13 +98,19 @@ void setup(void)
   {
     CoverScrollText("Connecting to MQTT", TFT_WHITE);
     mqttSetup();
+  }else
+  {
+    CoverScrollText("No WiFi", TFT_WHITE);
+    delay(1000);
   }
+
   CoverScrollText("Initializing SD card", TFT_WHITE);
   if(SD.begin(chipSelect))
     CoverScrollText("SD init done", TFT_WHITE);
   else 
     CoverScrollText("SD init failed", TFT_WHITE);
-  delay(3000);
+  delay(1000);
+
   CoverScrollText("Configuring raw LoRa", TFT_WHITE);
   rawLoRaSetup();
 

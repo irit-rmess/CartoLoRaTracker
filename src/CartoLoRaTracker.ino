@@ -126,6 +126,7 @@ void setup(void)
     CoverScrollText("SD init done", TFT_WHITE);
   else 
     CoverScrollText("SD init failed", TFT_WHITE);
+  M5.Speaker.mute();
   delay(1000);
 
   CoverScrollText("Configuring raw LoRa", TFT_WHITE);
@@ -148,6 +149,7 @@ void setup(void)
 
   M5.Lcd.setTextSize(2);
   M5.Lcd.fillScreen(BLACK);
+  M5.Speaker.mute();
 }
 
 void loop(void)
@@ -209,7 +211,7 @@ void loop(void)
       len += 2;
       *rawLoRaSqn++;
       //for (int i=0; i<len+rawLoRaHeaderSize; i++) Serial.printf("|%02x",rawLoRaFrame[i]); Serial.println("|");
-      //spreadingFactor = spreadingFactorsList[random(sizeof(spreadingFactorsList))];
+      //spreadingFactor = spreadingFactorsList[random(sizeof(spreadingFactorsList)/sizeof(spreadingFactorsList[0]))];
       //Serial.println(spreadingFactor);
       //rf95.setSpreadingFactor(spreadingFactor); delay(100);
       frequency = frequencyList[random(sizeof(frequencyList)/sizeof(frequencyList[0]))];
@@ -628,6 +630,8 @@ int conv_millis(void)//Fonction pour obtenir millisSinceUnixEpoch (ne fonctionne
 
 void beeps_init (void)
 {
+  M5.Speaker.mute();
+
   for (int i=0; i<BEEPS_SIZE; i++)
   {
     beeps[i].freq = 0;

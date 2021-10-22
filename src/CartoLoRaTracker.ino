@@ -19,8 +19,6 @@ const char* ssid = "xxx";
 const char* password = "xxx";
 const char* mqtt_server = "loraserver.tetaneutral.net";
 bool wifiConnSuccess = false;
-
-
 const int mqttPort = 1883; 
 int buzzerActive = 0;
 
@@ -32,11 +30,10 @@ int buzzerActive = 0;
 #define RFM95_CS 5 // M5-stack
 #define RFM95_DIO0 36 // M5-stack
 
-#define GNSS_UDP
-#define GNSS_UDP_PORT 3333
-//#define GNSS_SERIAL Serial2
+//#define GNSS_UDP
+//#define GNSS_UDP_PORT 3333
+#define GNSS_SERIAL Serial2
 
-#define RANDOM_SEED randomSeed(analogRead(0))
 #define MAX_RAWLORA_DATA_LEN 64 // Maximum RawLoRa frame size (from radiohead)
 #define MQTT_BUFFER_SIZE 4096
 #define SPEAKER_BEEP_DURATION 100
@@ -66,6 +63,7 @@ uint8_t spreadingFactor = 10;
 uint8_t spreadingFactorsList[] = {7, 8, 9, 10, 11, 12};
 uint8_t codingRate4 = 5;
 float frequency = 867.7;
+float frequencyList[] = {867.1, 867.3, 867.5, 867.7, 867.9, 868.1, 868.3, 868.5};
 int8_t txPower = 14;
 char mqttTopicPub[1024];
 char mqttTopicSub[1024];
@@ -145,6 +143,7 @@ void setup(void)
 #endif
 
   locapack.setdevice_id16(nodeAddress);
+  randomSeed(nodeAddress);
   timetosendlocapack = LOCAPACK_PACKET_PERIOD_NORMAL + random(LOCAPACK_PACKET_PERIOD_NORMAL);
 
   M5.Lcd.setTextSize(2);
@@ -213,6 +212,9 @@ void loop(void)
       //spreadingFactor = spreadingFactorsList[random(sizeof(spreadingFactorsList))];
       //Serial.println(spreadingFactor);
       //rf95.setSpreadingFactor(spreadingFactor); delay(100);
+      frequency = frequencyList[random(sizeof(frequencyList)/sizeof(frequencyList[0]))];
+      Serial.println(frequency);
+      rf95.setFrequency(frequency); delay(100);
       rf95.send(rawLoRaFrame, len+rawLoRaHeaderSize);
       rf95.waitPacketSent();
       printGeneratedLocapackPacket(&rawLoRaPayload[2],mqtt_payload_buffer);
@@ -252,19 +254,20 @@ void wifiSetup()
     retries++;
     Serial.print ( "." );
   }
-  if(retries < 6) {
-   wifiConnSuccess = true;
-   Serial.println("");
-   Serial.println("WiFi connected");
-   Serial.print("MAC: ");
-   Serial.println(WiFi.macAddress());
-   Serial.print("IP address: ");
-   Serial.println(WiFi.localIP());
-
-   // Set RawLoRa MAC address from two last WiFi MAC address
-   WiFi.macAddress(mac);
-   nodeAddress = mac[4]<<8|mac[5];
+  if(retries < 6)
+  {
+    wifiConnSuccess = true;
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.print("MAC: ");
+    Serial.println(WiFi.macAddress());
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
   }
+
+  // Set RawLoRa MAC address from two last WiFi MAC address
+  WiFi.macAddress(mac);
+  nodeAddress = mac[4]<<8|mac[5];
 }
 
 

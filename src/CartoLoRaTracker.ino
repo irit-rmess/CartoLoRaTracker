@@ -15,9 +15,16 @@
 #include "Display.h"
 #include <SD.h>
 
-const char* ssid = "xxx";
-const char* password = "xxx";
-const char* mqtt_server = "loraserver.tetaneutral.net";
+#define DEFAULT_WIFI_SSID "cartolora"
+#define DEFAULT_WIFI_PASSWORD "cartolora"
+#define DEFAULT_MQTT_SERVER "loraserver.tetaneutral.net"
+#define WIFI_SSID_INDIVIDUAL
+
+char ssid[64];
+char password[64];
+char mqtt_server[256];
+char tracker_name[256];
+uint8_t mac_address[6];
 bool wifiConnSuccess = false;
 const int mqttPort = 1883; 
 int buzzerActive = 0;
@@ -105,9 +112,18 @@ void setup(void)
   M5.Lcd.print("CartoLoraTracker");
   beeps_init();
 
+  // Set RawLoRa MAC address from two last WiFi MAC address
+  WiFi.macAddress(mac_address);
+  nodeAddress = mac_address[4]<<8|mac_address[5];
+
+  // Set tracker name using the RawLoRa MAC address
+  sprintf(tracker_name, "CartoLoRaTracker%d", nodeAddress);
+
 #ifdef GNSS_SERIAL
   GNSS_SERIAL.begin(9600);
 #endif
+
+  sprintf(mqtt_server, "%s", DEFAULT_MQTT_SERVER);
 
   CoverScrollText("Connecting to Wifi", TFT_WHITE);
   wifiSetup();
@@ -246,8 +262,21 @@ void loop(void)
 
 void wifiSetup()
 {
-  uint8_t mac[6];
   uint8_t retries = 0;
+
+#ifdef WIFI_SSID_INDIVIDUAL
+  sprintf(ssid, "%s%d", DEFAULT_WIFI_SSID, nodeAddress);
+#else
+  sprintf(ssid, "%s", DEFAULT_WIFI_SSID);
+#endif
+
+  sprintf(password, "%s", DEFAULT_WIFI_PASSWORD);
+
+  delay(1000);
+  Serial.print("SSID: ");
+  Serial.println(ssid);
+  Serial.print("Password: ");
+  Serial.println(password);
 
   WiFiMulti.addAP(ssid, password);
   while (( WiFiMulti.run() != WL_CONNECTED ) && (retries < 6))
@@ -266,10 +295,6 @@ void wifiSetup()
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
   }
-
-  // Set RawLoRa MAC address from two last WiFi MAC address
-  WiFi.macAddress(mac);
-  nodeAddress = mac[4]<<8|mac[5];
 }
 
 
@@ -336,7 +361,7 @@ void mqttReconnect(){
   while (!mqttClient.connected())
   {
     Serial.print("Connecting to MQTT broker... ");
-    if (mqttClient.connect("ESP32Client")) {
+    if (mqttClient.connect(tracker_name)) {
       Serial.println("connected.");
     }
     else
@@ -588,7 +613,7 @@ Serial.println("it's time");
       file.print(data);
       file.print(data2);
       file.println(data3);
-Serial.println("file updated");
+      Serial.println("file updated");
    }  
 }
 

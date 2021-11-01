@@ -17,6 +17,7 @@
 #include "cartolora_logo.h"
 
 #define DEFAULT_WIFI_SSID "cartolora"
+//#define WIFI_SSID_INDIVIDUAL // if defined, tracker id is append to SSID
 #define DEFAULT_WIFI_PASSWORD "cartolora"
 #define DEFAULT_MQTT_SERVER "loraserver.tetaneutral.net"
 #define WIFI_SSID_INDIVIDUAL
@@ -429,6 +430,7 @@ void updateLcd(void)
   {
     y+=30;
     M5.Lcd.setCursor(10, y);
+    if (gps.date.day() < 10) M5.Lcd.print("0");
     M5.Lcd.print(gps.date.day());
     M5.Lcd.print("/");
     if (gps.date.month() < 10) M5.Lcd.print("0");

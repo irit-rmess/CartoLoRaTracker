@@ -20,7 +20,6 @@
 //#define WIFI_SSID_INDIVIDUAL // if defined, tracker id is append to SSID
 #define DEFAULT_WIFI_PASSWORD "cartolora"
 #define DEFAULT_MQTT_SERVER "loraserver.tetaneutral.net"
-#define WIFI_SSID_INDIVIDUAL
 
 char ssid[64];
 char password[64];

@@ -14,6 +14,7 @@
 #include <PubSubClient.h>
 #include "Display.h"
 #include <SD.h>
+#include "cartolora_logo.h"
 
 #define DEFAULT_WIFI_SSID "cartolora"
 #define DEFAULT_WIFI_PASSWORD "cartolora"
@@ -108,8 +109,10 @@ void setup(void)
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setTextColor(WHITE);
   M5.Lcd.setTextSize(3);
-  M5.Lcd.setCursor(20, 50);
+  M5.Lcd.setCursor(20, 0);
   M5.Lcd.print("CartoLoraTracker");
+  M5.Lcd.drawXBitmap(60, 40, (const uint8_t *)cartolora_logo, CARTOLORA_LOGO_WIDTH, CARTOLORA_LOGO_HEIGHT, TFT_WHITE);
+  delay(1000);
   beeps_init();
 
   // Set RawLoRa MAC address from two last WiFi MAC address
@@ -124,6 +127,7 @@ void setup(void)
 #endif
 
   sprintf(mqtt_server, "%s", DEFAULT_MQTT_SERVER);
+  M5.Lcd.fillRect(60, 40, CARTOLORA_LOGO_WIDTH, CARTOLORA_LOGO_HEIGHT, TFT_BLACK);
 
   CoverScrollText("Connecting to Wifi", TFT_WHITE);
   wifiSetup();

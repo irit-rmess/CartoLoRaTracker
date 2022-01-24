@@ -92,6 +92,7 @@ const int packet_type = 1 ;
 // SD management
 int bandwith = signalBandwidth/1000;
 byte hour,minute,sec;
+byte previous_minute = 0;
 int month,day,year;
 const int chipSelect = 25;
 File file;
@@ -235,7 +236,7 @@ void loop(void)
       //Serial.println(spreadingFactor);
       //rf95.setSpreadingFactor(spreadingFactor); delay(100);
       frequency = frequencyList[random(sizeof(frequencyList)/sizeof(frequencyList[0]))];
-      Serial.println(frequency);
+      //Serial.println(frequency);
       rf95.setFrequency(frequency); delay(100);
       rf95.send(rawLoRaFrame, len+rawLoRaHeaderSize);
       rf95.waitPacketSent();
@@ -583,9 +584,10 @@ void ecriture_sd(void)
    year = gps.date.year();
    int jour, annee;
     
-   if (minute == 0 || minute ==10 || minute ==20 || minute == 30 || minute == 40 || minute == 50 ) //verification de la valeur de la variable minute
+   if ((previous_minute != minute) && minute == 0 || minute ==10 || minute ==20 || minute == 30 || minute == 40 || minute == 50 ) //verification de la valeur de la variable minute
    {
-Serial.println("it's time");
+      previous_minute = minute;
+
       file.close(); //fermeture de l'ancien fichier
       jour = conv_date(); //appel de la fonction servant à convertir la date en format quantien
       annee = year%10;// extraction du dernier chiffre de l'année
@@ -613,7 +615,7 @@ Serial.println("it's time");
       sprintf(TEST,"{\"Date\":\"%02d/%02d/%d\",\"Heure\":\"%02d:%02d:%02d\",",day,month,year,hour,minute,sec);
       sprintf(data,"\"protocol_version\":%d,\"timestamp\":%d,\"millisSinceUnixEpoch\":%d,\"packet_type\":%d,\"sequence_number\":%d,\"device_id\":%d,",protocol_version,tmp,millisSinceUnixEpoch,packet_type,sequence_number,NODE_ADDRESS);
       sprintf(data2,"\"latitude\":%.8f,\"longitude\":%.8f,\"altitude\":%.2f,\"dop\":%.2f,\"speed\":%d,",(gnss.latitude),(gnss.longitude),(gnss.altitude),(gnss.dop),vitesse);
-      sprintf(data3,"\"tx_power\":%d,\"frequency\":%d,\"bandwith\":%d,\"spreadingFactor\":%d}",txPower,frequency,bandwith,spreadingFactor);
+      sprintf(data3,"\"tx_power\":%d,\"frequency\":%.2f,\"bandwith\":%d,\"spreadingFactor\":%d}",txPower,frequency,bandwith,spreadingFactor);
       file.print(TEST);
       file.print(data);
       file.print(data2);

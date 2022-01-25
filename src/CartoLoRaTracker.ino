@@ -15,6 +15,11 @@
 #include "Display.h"
 #include <SD.h>
 #include "cartolora_logo.h"
+#include "gps_logo.h"
+#include "sd_logo.h"
+#include "speaker_logo.h"
+#include "wifi_logo.h"
+#include "lora_logo.h"
 
 #define DEFAULT_WIFI_SSID "cartolora"
 //#define WIFI_SSID_INDIVIDUAL // if defined, tracker id is append to SSID
@@ -100,6 +105,17 @@ static uint32_t sqn = 0;
 uint8_t buffer[64];
 int tmp;
 
+void drawStrikeThrough(int x, int y, int length, int width, int padding)
+{
+  for (int i = 0; i < width; i++)
+  {
+      int xi = x - width / 2 + i;
+      int yi = y - width / 2 + i;
+      uint32_t color = i < padding || width - 1 - i < padding ? TFT_BLACK : TFT_WHITE;
+      M5.Lcd.drawLine(xi, yi, xi + length, yi - length, color);
+      M5.Lcd.drawLine(xi + 1, yi, xi + length, yi - length + 1, color);
+  }
+}
 
 void setup(void)
 {
@@ -108,10 +124,29 @@ void setup(void)
   Serial.print("Starting ...\r\n");
   DisplayInit();
   M5.Lcd.fillScreen(BLACK);
+  M5.Lcd.drawRect(0, 0, TFT_HEIGHT, 40, TFT_WHITE);
   M5.Lcd.setTextColor(WHITE);
   M5.Lcd.setTextSize(3);
-  M5.Lcd.setCursor(20, 0);
+  M5.Lcd.setCursor(20, 10);
   M5.Lcd.print("CartoLoraTracker");
+  M5.Lcd.drawRect(10, 40, 100, 100, TFT_WHITE);
+  M5.Lcd.drawXBitmap(20, 50, (const uint8_t *)lora_logo, LORA_LOGO_WIDTH, LORA_LOGO_HEIGHT, TFT_WHITE);
+  M5.Lcd.drawRect(110, 40, 100, 100, TFT_WHITE);
+  M5.Lcd.drawXBitmap(120, 50, (const uint8_t *)gps_logo, GPS_LOGO_WIDTH, GPS_LOGO_HEIGHT, TFT_WHITE);
+  drawStrikeThrough(120, 130, 80, 10, 2);
+  M5.Lcd.drawRect(210, 40, 100, 100, TFT_WHITE);
+  M5.Lcd.drawXBitmap(220, 50, (const uint8_t *)wifi_logo, WIFI_LOGO_WIDTH, WIFI_LOGO_HEIGHT, TFT_WHITE);
+  M5.Lcd.drawRect(10, 140, 100, 100, TFT_WHITE);
+  M5.Lcd.drawXBitmap(20, 150, (const uint8_t *)speaker_logo, SPEAKER_LOGO_WIDTH, SPEAKER_LOGO_WIDTH, TFT_WHITE);
+  M5.Lcd.drawRect(110, 140, 100, 100, TFT_WHITE);
+  M5.Lcd.drawXBitmap(120, 150, (const uint8_t *)sd_logo, SD_LOGO_WIDTH, SD_LOGO_WIDTH, TFT_WHITE);
+  M5.Lcd.drawRect(210, 140, 100, 100, TFT_WHITE);
+  M5.Lcd.drawRoundRect(220, 170, 70, 40, 5, TFT_WHITE);
+  M5.Lcd.drawRoundRect(290, 180, 10, 20, 1, TFT_WHITE);
+  M5.Lcd.fillRect(227, 175, 10, 30, TFT_WHITE);
+  M5.Lcd.fillRect(243, 175, 10, 30, TFT_WHITE);
+  while(1);
+
   M5.Lcd.drawXBitmap(60, 40, (const uint8_t *)cartolora_logo, CARTOLORA_LOGO_WIDTH, CARTOLORA_LOGO_HEIGHT, TFT_WHITE);
   delay(1000);
   beeps_init();

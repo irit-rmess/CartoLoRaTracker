@@ -14,6 +14,7 @@
 #include <PubSubClient.h>
 #include "Display.h"
 #include <SD.h>
+#include <WiFiManager.h>
 #include "cartolora_logo.h"
 
 #define DEFAULT_WIFI_SSID "cartolora"
@@ -29,6 +30,7 @@ uint8_t mac_address[6];
 bool wifiConnSuccess = false;
 const int mqttPort = 1883; 
 int buzzerActive = 0;
+int configPortalActive = 0;
 
 #define NODE_ADDRESS 0x1234
 #define LOCAPACK_PACKET_PERIOD_NORMAL 20000
@@ -100,6 +102,7 @@ static uint32_t sqn = 0;
 uint8_t buffer[64];
 int tmp;
 
+WiFiManager wifiManager;
 
 void setup(void)
 {
@@ -130,17 +133,10 @@ void setup(void)
   sprintf(mqtt_server, "%s", DEFAULT_MQTT_SERVER);
   M5.Lcd.fillRect(60, 40, CARTOLORA_LOGO_WIDTH, CARTOLORA_LOGO_HEIGHT, TFT_BLACK);
 
-  CoverScrollText("Connecting to Wifi", TFT_WHITE);
-  wifiSetup();
-  if(wifiConnSuccess)
-  {
-    CoverScrollText("Connecting to MQTT", TFT_WHITE);
-    mqttSetup();
-  }else
-  {
-    CoverScrollText("No WiFi", TFT_WHITE);
-    delay(1000);
-  }
+  WiFi.begin();
+  wifiManager.setConfigPortalBlocking(false);
+
+  mqttSetup();
 
   CoverScrollText("Initializing SD card", TFT_WHITE);
   if(SD.begin(chipSelect))
@@ -188,8 +184,12 @@ void loop(void)
   }
 #endif
 
+  if (configPortalActive) {
+    wifiManager.process();
+  }
+
   // Wifi and MQTT
-  if(wifiConnSuccess)
+  if(WiFi.status() == WL_CONNECTED)
   {
     mqttReconnect();
     mqttClient.loop(); 
@@ -207,6 +207,15 @@ void loop(void)
     if ( rawLoRaSenderFastMode ) timetosendlocapack = millis() + LOCAPACK_PACKET_PERIOD_FAST;
     else timetosendlocapack = millis() + LOCAPACK_PACKET_PERIOD_NORMAL;
     M5.update(); 
+  }
+
+  if (M5.BtnC.wasReleased()) {
+    configPortalActive = !configPortalActive;
+    if (configPortalActive) {
+      wifiManager.startConfigPortal(tracker_name);
+    } else {
+      wifiManager.stopConfigPortal();
+    }
   }
 
   // Update speaker
@@ -311,7 +320,6 @@ void mqttSetup()
   if ( !mqttClient.setBufferSize(MQTT_BUFFER_SIZE) ) Serial.println("Error while setting MQTT buffer size");
   mqttClient.setServer(mqtt_server, mqttPort);
   mqttClient.setCallback(mqttCallback);
-  mqttReconnect();
 }
 
 
@@ -461,6 +469,10 @@ void updateLcd(void)
   M5.Lcd.setCursor(125, 220);
   if ( rawLoRaSenderFastMode ) M5.Lcd.print("normal");
   else M5.Lcd.print(" fast ");
+
+  M5.Lcd.setCursor(215, 220);
+  if ( configPortalActive ) M5.Lcd.print("no AP");
+  else M5.Lcd.print(" AP ");
 
   M5.update();
 }

@@ -135,6 +135,7 @@ void setup(void)
 
   WiFi.begin();
   wifiManager.setConfigPortalBlocking(false);
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
 
   mqttSetup();
 
@@ -709,3 +710,6 @@ void beeps_schedule (uint16_t freq, uint32_t duration)
   beeps[beeps_write].duration = duration;
 }
 
+void saveConfigCallback() {
+  configPortalActive = false;
+}

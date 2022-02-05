@@ -14,7 +14,7 @@
 #include <PubSubClient.h>
 #include "Display.h"
 #include <SD.h>
-#include <WiFiManager.h>
+#include <ConfigPortal.h>
 #include "cartolora_logo.h"
 
 #define DEFAULT_WIFI_SSID "cartolora"
@@ -30,7 +30,6 @@ uint8_t mac_address[6];
 bool wifiConnSuccess = false;
 const int mqttPort = 1883; 
 int buzzerActive = 0;
-int configPortalActive = 0;
 
 #define NODE_ADDRESS 0x1234
 #define LOCAPACK_PACKET_PERIOD_NORMAL 20000
@@ -102,7 +101,6 @@ static uint32_t sqn = 0;
 uint8_t buffer[64];
 int tmp;
 
-WiFiManager wifiManager;
 
 void setup(void)
 {
@@ -134,8 +132,8 @@ void setup(void)
   M5.Lcd.fillRect(60, 40, CARTOLORA_LOGO_WIDTH, CARTOLORA_LOGO_HEIGHT, TFT_BLACK);
 
   WiFi.begin();
-  wifiManager.setConfigPortalBlocking(false);
-  wifiManager.setSaveConfigCallback(saveConfigCallback);
+
+  ConfigPortalSetup();
 
   mqttSetup();
 
@@ -185,8 +183,8 @@ void loop(void)
   }
 #endif
 
-  if (configPortalActive) {
-    wifiManager.process();
+  if (ConfigPortalActive()) {
+    ConfigPortalProcess();
   }
 
   // Wifi and MQTT
@@ -211,11 +209,10 @@ void loop(void)
   }
 
   if (M5.BtnC.wasReleased()) {
-    configPortalActive = !configPortalActive;
-    if (configPortalActive) {
-      wifiManager.startConfigPortal(tracker_name);
+    if (ConfigPortalActive()) {
+      ConfigPortalStop();
     } else {
-      wifiManager.stopConfigPortal();
+      ConfigPortalStart(tracker_name);
     }
   }
 
@@ -472,7 +469,7 @@ void updateLcd(void)
   else M5.Lcd.print(" fast ");
 
   M5.Lcd.setCursor(215, 220);
-  if ( configPortalActive ) M5.Lcd.print("no AP");
+  if ( ConfigPortalActive() ) M5.Lcd.print("no AP");
   else M5.Lcd.print(" AP ");
 
   M5.update();
@@ -708,8 +705,4 @@ void beeps_schedule (uint16_t freq, uint32_t duration)
   if (++beeps_write == BEEPS_SIZE) beeps_write = 0;
   beeps[beeps_write].freq = freq;
   beeps[beeps_write].duration = duration;
-}
-
-void saveConfigCallback() {
-  configPortalActive = false;
 }

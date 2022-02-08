@@ -24,7 +24,6 @@
 
 char ssid[64];
 char password[64];
-char mqtt_server[256];
 char tracker_name[256];
 uint8_t mac_address[6];
 bool wifiConnSuccess = false;
@@ -128,7 +127,6 @@ void setup(void)
   GNSS_SERIAL.begin(9600);
 #endif
 
-  sprintf(mqtt_server, "%s", DEFAULT_MQTT_SERVER);
   M5.Lcd.fillRect(60, 40, CARTOLORA_LOGO_WIDTH, CARTOLORA_LOGO_HEIGHT, TFT_BLACK);
 
   WiFi.begin();
@@ -168,6 +166,8 @@ void setup(void)
   M5.Speaker.mute();
 }
 
+unsigned long last_reconnect = 0;
+
 void loop(void)
 {
   uint8_t len = 0;
@@ -188,10 +188,13 @@ void loop(void)
   }
 
   // Wifi and MQTT
-  if(WiFi.status() == WL_CONNECTED)
+  if(WiFi.status() == WL_CONNECTED && !mqttClient.connected() && (millis() - last_reconnect) > 5000)
   {
+    last_reconnect = millis();
     mqttReconnect();
-    mqttClient.loop(); 
+    if (mqttClient.connected()) {
+        mqttClient.loop();
+    }
   }
 
   // Short press on button A to mute or unmute speaker 
@@ -316,7 +319,7 @@ void mqttSetup()
   sprintf(mqttTopicSub,"rawloraprobe/%d/#", nodeAddress);
 
   if ( !mqttClient.setBufferSize(MQTT_BUFFER_SIZE) ) Serial.println("Error while setting MQTT buffer size");
-  mqttClient.setServer(mqtt_server, mqttPort);
+  mqttClient.setServer(getMQTTServer(), getMQTTPort());
   mqttClient.setCallback(mqttCallback);
 }
 
@@ -369,21 +372,16 @@ void mqttCallback(char* topic, byte *payload, unsigned int length)
 
 
 void mqttReconnect(){
-  while (!mqttClient.connected())
-  {
-    Serial.print("Connecting to MQTT broker... ");
-    if (mqttClient.connect(tracker_name)) {
-      Serial.println("connected.");
-    }
-    else
-    {
-      Serial.print("failed. Error code=");
-      Serial.println(mqttClient.state());
-      Serial.println(". Retrying.");
-      delay(2000);
-    }
+  Serial.print("Connecting to MQTT broker... ");
+  if (mqttClient.connect(tracker_name)) {
+    Serial.println("connected.");
+    mqttClient.subscribe(mqttTopicSub);
   }
-  mqttClient.subscribe(mqttTopicSub);
+  else
+  {
+    Serial.print("failed. Error code=");
+    Serial.println(mqttClient.state());
+  }
 }
 
 

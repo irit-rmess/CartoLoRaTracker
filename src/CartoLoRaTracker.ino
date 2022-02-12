@@ -15,6 +15,10 @@
 #include <SD.h>
 #include <Config.h>
 #include <ConfigPortal.h>
+#ifdef USE_TLS
+#include <WiFiClientSecure.h>
+#include "CACert.h"
+#endif
 #include "cartolora_logo.h"
 
 char tracker_name[256];
@@ -39,7 +43,11 @@ int buzzerActive = 0;
 #define BEEPS_SIZE 64
 
 RH_RF95 rf95(RFM95_CS, RFM95_DIO0);
+#ifdef USE_TLS
+WiFiClientSecure espClient;
+#else
 WiFiClient espClient;
+#endif
 AsyncUDP udp;
 PubSubClient mqttClient(espClient);
 TinyGPSPlus gps;
@@ -111,6 +119,10 @@ void setup(void)
 
   // Set tracker name using the RawLoRa MAC address
   sprintf(tracker_name, "CartoLoRaTracker%d", nodeAddress);
+
+#ifdef USE_TLS
+  espClient.setCACert(ca_cert);
+#endif
 
 #ifdef GNSS_SERIAL
   GNSS_SERIAL.begin(9600);

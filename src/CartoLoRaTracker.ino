@@ -19,8 +19,6 @@
 
 char tracker_name[256];
 uint8_t mac_address[6];
-bool wifiConnSuccess = false;
-const int mqttPort = 1883; 
 int buzzerActive = 0;
 
 #define NODE_ADDRESS 0x1234
@@ -243,7 +241,7 @@ void loop(void)
       rf95.send(rawLoRaFrame, len+rawLoRaHeaderSize);
       rf95.waitPacketSent();
       printGeneratedLocapackPacket(&rawLoRaPayload[2],mqtt_payload_buffer);
-      if(wifiConnSuccess)
+      if(mqttClient.connected())
       {
         mqttClient.publish(mqttTopicPub, mqtt_payload_buffer);
       }

@@ -9,7 +9,6 @@
 #include <math.h>
 #include <M5Stack.h>
 #include <WiFi.h>
-#include <WiFiMulti.h> 
 #include "AsyncUDP.h"
 #include <PubSubClient.h>
 #include "Display.h"
@@ -18,13 +17,6 @@
 #include <ConfigPortal.h>
 #include "cartolora_logo.h"
 
-#define DEFAULT_WIFI_SSID "cartolora"
-//#define WIFI_SSID_INDIVIDUAL // if defined, tracker id is append to SSID
-#define DEFAULT_WIFI_PASSWORD "cartolora"
-#define DEFAULT_MQTT_SERVER "loraserver.tetaneutral.net"
-
-char ssid[64];
-char password[64];
 char tracker_name[256];
 uint8_t mac_address[6];
 bool wifiConnSuccess = false;
@@ -49,7 +41,6 @@ int buzzerActive = 0;
 #define BEEPS_SIZE 64
 
 RH_RF95 rf95(RFM95_CS, RFM95_DIO0);
-WiFiMulti WiFiMulti;
 WiFiClient espClient;
 AsyncUDP udp;
 PubSubClient mqttClient(espClient);
@@ -173,7 +164,6 @@ unsigned long last_reconnect = 0;
 void loop(void)
 {
   uint8_t len = 0;
-  uint16_t srcMacAddr;
   char mqtt_payload_buffer[MQTT_BUFFER_SIZE];
 
 #ifdef GNSS_SERIAL
@@ -276,44 +266,6 @@ void loop(void)
 
   M5.update();
 }
-
-void wifiSetup()
-{
-  uint8_t retries = 0;
-
-#ifdef WIFI_SSID_INDIVIDUAL
-  sprintf(ssid, "%s%d", DEFAULT_WIFI_SSID, nodeAddress);
-#else
-  sprintf(ssid, "%s", DEFAULT_WIFI_SSID);
-#endif
-
-  sprintf(password, "%s", DEFAULT_WIFI_PASSWORD);
-
-  delay(1000);
-  Serial.print("SSID: ");
-  Serial.println(ssid);
-  Serial.print("Password: ");
-  Serial.println(password);
-
-  WiFiMulti.addAP(ssid, password);
-  while (( WiFiMulti.run() != WL_CONNECTED ) && (retries < 6))
-  {
-    delay ( 500 );
-    retries++;
-    Serial.print ( "." );
-  }
-  if(retries < 6)
-  {
-    wifiConnSuccess = true;
-    Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.print("MAC: ");
-    Serial.println(WiFi.macAddress());
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-  }
-}
-
 
 void mqttSetup()
 {

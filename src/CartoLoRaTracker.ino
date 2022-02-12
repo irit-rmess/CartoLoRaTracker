@@ -14,6 +14,7 @@
 #include <PubSubClient.h>
 #include "Display.h"
 #include <SD.h>
+#include <Config.h>
 #include <ConfigPortal.h>
 #include "cartolora_logo.h"
 
@@ -131,6 +132,7 @@ void setup(void)
 
   WiFi.begin();
 
+  config.begin();
   ConfigPortalSetup();
 
   mqttSetup();
@@ -319,7 +321,7 @@ void mqttSetup()
   sprintf(mqttTopicSub,"rawloraprobe/%d/#", nodeAddress);
 
   if ( !mqttClient.setBufferSize(MQTT_BUFFER_SIZE) ) Serial.println("Error while setting MQTT buffer size");
-  mqttClient.setServer(getMQTTServer(), getMQTTPort());
+  mqttClient.setServer(config.getMQTTServer(), (uint16_t) strtol(config.getMQTTPort(), NULL, 10));
   mqttClient.setCallback(mqttCallback);
 }
 

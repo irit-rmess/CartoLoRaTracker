@@ -133,7 +133,7 @@ void setup(void)
   WiFi.begin();
 
   config.begin();
-  ConfigPortalSetup();
+  configPortal.setup();
 
   mqttSetup();
 
@@ -185,8 +185,8 @@ void loop(void)
   }
 #endif
 
-  if (ConfigPortalActive()) {
-    ConfigPortalProcess();
+  if (configPortal.isActive()) {
+    configPortal.process();
   }
 
   // Wifi and MQTT
@@ -214,10 +214,10 @@ void loop(void)
   }
 
   if (M5.BtnC.wasReleased()) {
-    if (ConfigPortalActive()) {
-      ConfigPortalStop();
+    if (configPortal.isActive()) {
+      configPortal.stop();
     } else {
-      ConfigPortalStart(tracker_name);
+      configPortal.start(tracker_name);
     }
   }
 
@@ -469,7 +469,7 @@ void updateLcd(void)
   else M5.Lcd.print(" fast ");
 
   M5.Lcd.setCursor(215, 220);
-  if ( ConfigPortalActive() ) M5.Lcd.print("no AP");
+  if ( configPortal.isActive() ) M5.Lcd.print("no AP");
   else M5.Lcd.print(" AP ");
 
   M5.update();

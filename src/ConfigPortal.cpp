@@ -1,46 +1,43 @@
-#include <WiFiManager.h>
-#include "Config.h"
 #include "ConfigPortal.h"
 
+void ConfigPortal::WiFiManagerSaveConfigCallback() {
+  configPortal.saveConfig();
+}
 
-WiFiManager wifiManager;
-WiFiManagerParameter wmp_mqtt_server("mqtt_server", "MQTT Server", "", MQTT_SERVER_STRING_SIZE);
-WiFiManagerParameter wmp_mqtt_port("mqtt_port", "MQTT Port", "", MQTT_PORT_STRING_SIZE);
-
-bool configPortalActive = false;
-
-void saveConfigCallback() {
-  configPortalActive = false;
+void ConfigPortal::saveConfig() {
+  is_active = false;
   config.setMQTTServer((char *) wmp_mqtt_server.getValue());
   config.setMQTTPort((char * ) wmp_mqtt_port.getValue());
   config.save();
 }
 
-void ConfigPortalSetup() {
+void ConfigPortal::setup() {
   wmp_mqtt_server.setValue(config.getMQTTServer(), MQTT_SERVER_STRING_SIZE);
   wmp_mqtt_port.setValue(config.getMQTTPort(), MQTT_PORT_STRING_SIZE);
 
   wifiManager.setConfigPortalBlocking(false);
-  wifiManager.setSaveConfigCallback(saveConfigCallback);
+  wifiManager.setSaveConfigCallback(ConfigPortal::WiFiManagerSaveConfigCallback);
   wifiManager.setBreakAfterConfig(true);
   wifiManager.addParameter(&wmp_mqtt_server);
   wifiManager.addParameter(&wmp_mqtt_port);
 }
 
-void ConfigPortalProcess() {
+void ConfigPortal::process() {
   wifiManager.process();
 }
 
-void ConfigPortalStart(char *name) {
+void ConfigPortal::start(char *name) {
   wifiManager.startConfigPortal(name);
-  configPortalActive = true;
+  is_active = true;
 }
 
-void ConfigPortalStop() {
+void ConfigPortal::stop() {
   wifiManager.stopConfigPortal();
-  configPortalActive = false;
+  is_active = false;
 }
 
-bool ConfigPortalActive() {
-  return configPortalActive;
+bool ConfigPortal::isActive() {
+  return is_active;
 }
+
+ConfigPortal configPortal;

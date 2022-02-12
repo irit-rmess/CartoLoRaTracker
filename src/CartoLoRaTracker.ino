@@ -160,7 +160,7 @@ unsigned long last_reconnect = 0;
 
 void loop(void)
 {
-  char mqtt_payload_buffer[MQTT_BUFFER_SIZE];
+  static char mqtt_payload_buffer[MQTT_BUFFER_SIZE];
 
 #ifdef GNSS_SERIAL
   // Get chars from GPS receiver

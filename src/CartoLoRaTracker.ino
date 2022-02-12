@@ -86,7 +86,6 @@ byte previous_minute = 0;
 int month,day,year;
 const int chipSelect = 25;
 File file;
-static uint32_t sqn = 0;
 uint8_t buffer[64];
 int tmp;
 
@@ -161,7 +160,6 @@ unsigned long last_reconnect = 0;
 
 void loop(void)
 {
-  uint8_t len = 0;
   char mqtt_payload_buffer[MQTT_BUFFER_SIZE];
 
 #ifdef GNSS_SERIAL
@@ -458,13 +456,12 @@ void printGeneratedLocapackPacket (uint8_t* buffer, char* str_temp)
   uint8_t payload_len;
   Locapack::locapacket_t locapacket;
   int decoded_payload_len;
-  int ret;
   char header_data[512];
   char payload_data[512];
   char physical_data[512];
   char timestamp_str[24];
 
-  ret = locapack.decodePacket(&protocol_version, &movement_id_presence_flag, &timestamp_presence_flag, &packet_type, &sequence_number, &timestamp, &movement_id, &device_id, payload, &payload_len, buffer);
+  locapack.decodePacket(&protocol_version, &movement_id_presence_flag, &timestamp_presence_flag, &packet_type, &sequence_number, &timestamp, &movement_id, &device_id, payload, &payload_len, buffer);
 
   printUint64(timestamp, timestamp_str);
   sprintf(header_data,

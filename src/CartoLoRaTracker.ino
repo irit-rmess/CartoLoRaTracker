@@ -548,7 +548,23 @@ uint64_t ttt=0;
    minute = gps.time.minute();
    year = gps.date.year();
 
+
+Serial.print(day);
+Serial.print("/");
+Serial.print(month);
+Serial.print("/");
+Serial.print(year);
+Serial.print(" ");
+Serial.print(hour);
+Serial.print(":");
+Serial.print(minute);
+Serial.print(":");
+Serial.print(sec);
+Serial.println();
+
 ttt = conv_millis();
+
+Serial.printf("it's %llu\n",ttt);
 return(ttt);
 }
 
@@ -633,18 +649,45 @@ int conv_date(void)//Fonction pour convertir la date en quantième
    return nb;
 }
 
-int conv_millis(void)//Fonction pour obtenir millisSinceUnixEpoch (ne fonctionne pas)
+int conv_millis(void)//Fonction pour obtenir millisSinceUnixEpoch 
 {
-  int nb = 1;
+  
+  uint64_t nb = 1;
+  int anbiss=0;
+  int annorm = 0;
+  int jours = 0;
+  int remnant = 0;
   for (int i = 1970; i < year ; i++) // nombre de millis entre 1970 et l'année en cours
   {
-    if (i%4 ==0) // année bisextile
-      nb = nb + (366 * 24 * 60 * 60* 1000);
+    if ((i%4 ==0)&&((i == 1972) ||(i == 1976) ||(i == 1980) ||(i == 1984) ||(i == 1988) ||(i == 1992) ||(i == 1996) ||(i == 2000) ||(i == 2004) ||(i == 2008) ||(i == 2012) ||(i == 2016) ||(i == 2020))) // année bisextile
+    {
+      //nb = nb + (366 * 24 * 60 * 60* 1000);
+      anbiss++;
+    }
     else //année classique
-      nb = nb + ( 365 * 24 * 60 * 60* 1000);
+    {
+      //nb = nb + ( 365 * 24 * 60 * 60* 1000);
+      annorm++;
+    }
   }
+  nb = nb +  (anbiss*366+annorm*365)*24*60*60*1000;
+//Serial.printf("years %llu\n\r",nb);
   nb = nb + (conv_date()* 24 * 60 *60*1000);//ajout des millis depeuis début de l'année
+//Serial.printf("+convdate %llu\n\r",nb);
   nb = nb + (hour * 60 *60 *1000) + (minute *60  *1000 + sec * 1000);//ajout des millis depuis le début du jour actuel
+//Serial.printf("+hoursMinsSecs %llu\n\r",nb);
+jours = conv_date();
+remnant = (hour * 60 *60 *1000) + (minute *60  *1000 + sec * 1000);
+
+/*Serial.print("anbiss \t annorm \t jours \t reste\n\r");
+Serial.print(anbiss);
+Serial.print("\t");
+Serial.print(annorm);
+Serial.print("\t");
+Serial.print(jours);
+Serial.print("\t");
+Serial.print(remnant);
+Serial.println();*/
   return nb;
 }
 

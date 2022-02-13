@@ -96,7 +96,7 @@ const int chipSelect = 25;
 File file;
 uint8_t buffer[64];
 int tmp;
-
+uint64_t currentPacketTimeSince70;
 
 void setup(void)
 {
@@ -236,6 +236,7 @@ void loop(void)
       Serial.print("I create a new packet with position recorded ");
       Serial.print(millis() - gnss_age);
       Serial.println("ms ago.");
+      currentPacketTimeSince70 = generateTimingInfo();
       rawLoRaPayload[0] = '1';
       rawLoRaPayload[1] = '0';
       int len = locapack.createUniversalGnssPacket(&gnss, &rawLoRaPayload[2]);
@@ -479,11 +480,11 @@ void printGeneratedLocapackPacket (uint8_t* buffer, char* str_temp)
   sprintf(header_data,
     "\"protocol_version\":%d"
     ",\"timestamp\":%s"
-    ",\"millisSinceUnixEpoch\":%d"
+    ",\"millisSinceUnixEpoch\":%llu"
     ",\"packet_type\":%d"
     ",\"sequence_number\":%d"
     ",\"device_id\":%d"
-    , protocol_version, timestamp_str, 0, packet_type, sequence_number, nodeAddress);
+    , protocol_version, timestamp_str, currentPacketTimeSince70, packet_type, sequence_number, nodeAddress);
 
   switch ( packet_type )
   {
@@ -535,6 +536,24 @@ void printUint64(uint64_t value, char* sz)
   }
 }
 
+// records the value of millisSinceUnixEpoch
+uint64_t generateTimingInfo()
+{
+
+uint64_t ttt=0;
+   day = gps.date.day();
+   month = gps.date.month();
+   hour = gps.time.hour();
+   sec = gps.time.second();
+   minute = gps.time.minute();
+   year = gps.date.year();
+
+ttt = conv_millis();
+return(ttt);
+}
+
+
+
 void ecriture_sd(void)
 {
     
@@ -573,7 +592,7 @@ void ecriture_sd(void)
    
    if (file) 
    {
-      int millisSinceUnixEpoch =0;  
+      uint64_t millisSinceUnixEpoch = currentPacketTimeSince70;  
       int vitesse = gps.speed.kmph();
       //int sequence_number = simplewino.decodeUi16(&buffer[4]);
       //tmp = simplewino.decodeUi40(&buffer[6]);
@@ -582,7 +601,7 @@ void ecriture_sd(void)
       tmp = buffer[6] + buffer[7] << 8 + buffer[8] << 16 + buffer[9] << 24 + buffer[10] << 32;
       
       sprintf(TEST,"{\"Date\":\"%02d/%02d/%d\",\"Heure\":\"%02d:%02d:%02d\",",day,month,year,hour,minute,sec);
-      sprintf(data,"\"protocol_version\":%d,\"timestamp\":%d,\"millisSinceUnixEpoch\":%d,\"packet_type\":%d,\"sequence_number\":%d,\"device_id\":%d,",protocol_version,tmp,millisSinceUnixEpoch,packet_type,sequence_number,NODE_ADDRESS);
+      sprintf(data,"\"protocol_version\":%d,\"timestamp\":%d,\"millisSinceUnixEpoch\":%llu,\"packet_type\":%d,\"sequence_number\":%d,\"device_id\":%d,",protocol_version,tmp,millisSinceUnixEpoch,packet_type,sequence_number,NODE_ADDRESS);
       sprintf(data2,"\"latitude\":%.8f,\"longitude\":%.8f,\"altitude\":%.2f,\"dop\":%.2f,\"speed\":%d,",(gnss.latitude),(gnss.longitude),(gnss.altitude),(gnss.dop),vitesse);
       sprintf(data3,"\"tx_power\":%d,\"frequency\":%.2f,\"bandwith\":%d,\"spreadingFactor\":%d}",txPower,frequency,bandwith,spreadingFactor);
       file.print(TEST);

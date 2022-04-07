@@ -192,9 +192,10 @@ void loop(void)
   {
     last_reconnect = millis();
     mqttReconnect();
-    if (mqttClient.connected()) {
-        mqttClient.loop();
-    }
+  }
+
+  if (mqttClient.connected()) {
+      mqttClient.loop();
   }
 
   // Short press on button A to mute or unmute speaker 
